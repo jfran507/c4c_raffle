@@ -135,7 +135,15 @@ All raffle data and images are stored locally:
 - User credentials: `data/users.json`
 - Images: `uploads/` directory
 
-Make sure to backup these directories before the event!
+**IMPORTANT for Railway Deployment:**
+To prevent data loss on each deployment, you MUST set up persistent volumes:
+
+1. Go to your Railway project dashboard
+2. Click on the **Variables** tab
+3. Add a volume with mount path: `/app/data`
+4. Add another volume with mount path: `/app/uploads`
+
+These volumes will persist your data and images across all future deployments.
 
 ## Troubleshooting
 
