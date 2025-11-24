@@ -253,6 +253,13 @@
         document.getElementById('addRaffleForm').addEventListener('submit', async (e) => {
             e.preventDefault();
 
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+
+            // Disable button to prevent double-clicks
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Adding...';
+
             const formData = new FormData();
             formData.append('username', currentCredentials.username);
             formData.append('password', currentCredentials.password);
@@ -264,6 +271,8 @@
                 if (!fileInput) {
                     document.getElementById('form-message').innerHTML =
                         '<div class="error-message">Please select an image file</div>';
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = originalText;
                     return;
                 }
                 formData.append('image', fileInput);
@@ -272,6 +281,8 @@
                 if (!imageUrl) {
                     document.getElementById('form-message').innerHTML =
                         '<div class="error-message">Please enter an image URL</div>';
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = originalText;
                     return;
                 }
                 formData.append('imageUrl', imageUrl);
@@ -300,8 +311,13 @@
                         `<div class="error-message">Error: ${result.message}</div>`;
                 }
             } catch (error) {
+                console.error('Error adding raffle:', error);
                 document.getElementById('form-message').innerHTML =
                     '<div class="error-message">Error adding raffle item. Please try again.</div>';
+            } finally {
+                // Re-enable button
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
             }
         });
 
@@ -649,12 +665,6 @@
             const winningNumber = document.getElementById(`winner-${raffleId}`).value.trim();
             const messageDiv = document.getElementById(`winner-message-${raffleId}`);
 
-            if (!winningNumber) {
-                messageDiv.innerHTML = '<span class="error-text">Please enter a winning number</span>';
-                setTimeout(() => messageDiv.innerHTML = '', 3000);
-                return;
-            }
-
             try {
                 const response = await fetch(`/api/raffles/${raffleId}/winner`, {
                     method: 'PUT',
@@ -669,7 +679,8 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    messageDiv.innerHTML = '<span class="success-text">Updated!</span>';
+                    const message = winningNumber ? 'Winner updated!' : 'Winner cleared!';
+                    messageDiv.innerHTML = `<span class="success-text">${message}</span>`;
                     setTimeout(() => {
                         messageDiv.innerHTML = '';
                         loadRaffles();

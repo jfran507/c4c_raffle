@@ -76,6 +76,8 @@ function writeData(file, data) {
 }
 
 function downloadImageFromUrl(url, callback) {
+  console.log('Attempting to download image from URL:', url);
+
   const protocol = url.startsWith('https') ? https : http;
   const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
   const filename = uniqueSuffix + '.jpg';
@@ -83,8 +85,22 @@ function downloadImageFromUrl(url, callback) {
   const file = fs.createWriteStream(filepath);
 
   protocol.get(url, (response) => {
+    console.log('Response status code:', response.statusCode);
+
+    // Handle redirects (301, 302, 307, 308)
+    if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+      console.log('Following redirect to:', response.headers.location);
+      file.close();
+      fs.unlink(filepath, () => {});
+      downloadImageFromUrl(response.headers.location, callback);
+      return;
+    }
+
     if (response.statusCode !== 200) {
-      callback(new Error(`Failed to download image: ${response.statusCode}`), null);
+      console.error('Failed to download image, status code:', response.statusCode);
+      file.close();
+      fs.unlink(filepath, () => {});
+      callback(new Error(`Failed to download image: HTTP ${response.statusCode}`), null);
       return;
     }
 
@@ -92,14 +108,17 @@ function downloadImageFromUrl(url, callback) {
 
     file.on('finish', () => {
       file.close();
+      console.log('Image downloaded successfully:', filename);
       callback(null, filename);
     });
 
     file.on('error', (err) => {
+      console.error('File write error:', err);
       fs.unlink(filepath, () => {});
       callback(err, null);
     });
   }).on('error', (err) => {
+    console.error('Download error:', err);
     fs.unlink(filepath, () => {});
     callback(err, null);
   });
@@ -197,7 +216,10 @@ app.post('/api/raffles', upload.single('image'), (req, res) => {
     downloadImageFromUrl(imageUrl, (err, filename) => {
       if (err) {
         console.error('Error downloading image:', err);
-        return res.status(400).json({ success: false, message: 'Failed to download image from URL' });
+        return res.status(400).json({
+          success: false,
+          message: `Failed to download image from URL: ${err.message}. Please try a direct image link or upload a file instead.`
+        });
       }
       handleRaffleCreation(filename);
     });
@@ -287,7 +309,10 @@ app.put('/api/raffles/:id', upload.single('image'), (req, res) => {
     downloadImageFromUrl(imageUrl, (err, filename) => {
       if (err) {
         console.error('Error downloading image:', err);
-        return res.status(400).json({ success: false, message: 'Failed to download image from URL' });
+        return res.status(400).json({
+          success: false,
+          message: `Failed to download image from URL: ${err.message}. Please try a direct image link or upload a file instead.`
+        });
       }
       handleRaffleUpdate(filename);
     });
@@ -306,10 +331,6 @@ app.put('/api/raffles/:id/winner', (req, res) => {
     return res.status(401).json({ success: false, message: 'Unauthorized' });
   }
 
-  if (!winningNumber) {
-    return res.status(400).json({ success: false, message: 'Winning number required' });
-  }
-
   const raffles = readData(DATA_FILE);
   const raffleIndex = raffles.findIndex(r => r.id === raffleId);
 
@@ -317,7 +338,8 @@ app.put('/api/raffles/:id/winner', (req, res) => {
     return res.status(404).json({ success: false, message: 'Raffle not found' });
   }
 
-  raffles[raffleIndex].winningNumber = winningNumber;
+  // Allow clearing the winning number by setting it to null or empty string
+  raffles[raffleIndex].winningNumber = winningNumber && winningNumber.trim() !== '' ? winningNumber : null;
 
   if (writeData(DATA_FILE, raffles)) {
     res.json({ success: true, raffle: raffles[raffleIndex] });
