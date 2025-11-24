@@ -84,12 +84,21 @@ function downloadImageFromUrl(url, callback) {
   const filepath = path.join(__dirname, 'uploads', filename);
   const file = fs.createWriteStream(filepath);
 
-  protocol.get(url, (response) => {
+  // Set a timeout of 15 seconds
+  const timeout = setTimeout(() => {
+    console.error('Download timeout after 15 seconds');
+    file.close();
+    fs.unlink(filepath, () => {});
+    callback(new Error('Download timeout - URL took too long to respond'), null);
+  }, 15000);
+
+  const request = protocol.get(url, (response) => {
     console.log('Response status code:', response.statusCode);
 
     // Handle redirects (301, 302, 307, 308)
     if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
       console.log('Following redirect to:', response.headers.location);
+      clearTimeout(timeout);
       file.close();
       fs.unlink(filepath, () => {});
       downloadImageFromUrl(response.headers.location, callback);
@@ -98,6 +107,7 @@ function downloadImageFromUrl(url, callback) {
 
     if (response.statusCode !== 200) {
       console.error('Failed to download image, status code:', response.statusCode);
+      clearTimeout(timeout);
       file.close();
       fs.unlink(filepath, () => {});
       callback(new Error(`Failed to download image: HTTP ${response.statusCode}`), null);
@@ -107,6 +117,7 @@ function downloadImageFromUrl(url, callback) {
     response.pipe(file);
 
     file.on('finish', () => {
+      clearTimeout(timeout);
       file.close();
       console.log('Image downloaded successfully:', filename);
       callback(null, filename);
@@ -114,13 +125,25 @@ function downloadImageFromUrl(url, callback) {
 
     file.on('error', (err) => {
       console.error('File write error:', err);
+      clearTimeout(timeout);
       fs.unlink(filepath, () => {});
       callback(err, null);
     });
   }).on('error', (err) => {
     console.error('Download error:', err);
+    clearTimeout(timeout);
     fs.unlink(filepath, () => {});
     callback(err, null);
+  });
+
+  // Handle request timeout
+  request.setTimeout(15000, () => {
+    console.error('Request timeout');
+    request.destroy();
+    clearTimeout(timeout);
+    file.close();
+    fs.unlink(filepath, () => {});
+    callback(new Error('Request timeout'), null);
   });
 }
 

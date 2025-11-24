@@ -60,7 +60,7 @@
                         </div>
                         <div id="url-upload-section" class="upload-section" style="display: none;">
                             <input type="text" id="raffle-image-url" placeholder="Paste image URL (e.g., from Google Images)">
-                            <p class="hint">Right-click an image in Google Images and select "Copy image address"</p>
+                            <p class="hint"><strong>Tip:</strong> In Google Images, click the image to open it, then right-click the full-size image and select "Open image in new tab". Copy that URL. (Some Google cached URLs may not work - if it fails, try uploading from file instead.)</p>
                         </div>
                         <div id="image-preview"></div>
                     </div>
@@ -127,7 +127,7 @@
                     </div>
                     <div id="edit-url-upload-section" class="upload-section" style="display: none;">
                         <input type="text" id="edit-raffle-image-url" placeholder="Paste image URL (e.g., from Google Images)">
-                        <p class="hint">Right-click an image in Google Images and select "Copy image address"</p>
+                        <p class="hint"><strong>Tip:</strong> In Google Images, click the image to open it, then right-click the full-size image and select "Open image in new tab". Copy that URL. (Some Google cached URLs may not work - if it fails, try uploading from file instead.)</p>
                     </div>
                     <div id="edit-image-preview"></div>
                 </div>
@@ -294,7 +294,13 @@
                     body: formData
                 });
 
-                const result = await response.json();
+                let result;
+                try {
+                    result = await response.json();
+                } catch (jsonError) {
+                    console.error('Failed to parse response:', jsonError);
+                    throw new Error('Invalid server response');
+                }
 
                 if (result.success) {
                     document.getElementById('form-message').innerHTML =
@@ -313,7 +319,7 @@
             } catch (error) {
                 console.error('Error adding raffle:', error);
                 document.getElementById('form-message').innerHTML =
-                    '<div class="error-message">Error adding raffle item. Please try again.</div>';
+                    `<div class="error-message">Error: ${error.message || 'Error adding raffle item. Please try again.'}</div>`;
             } finally {
                 // Re-enable button
                 submitBtn.disabled = false;
