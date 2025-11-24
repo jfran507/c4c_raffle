@@ -335,10 +335,10 @@
                 searchCount.textContent = '';
             }
 
+                const isFiltered = raffles.length < allAdminRaffles.length;
+
                 container.innerHTML = `
-                    <div class="reorder-instructions">
-                        <p><strong>💡 Tip:</strong> Drag and drop rows to reorder raffle items</p>
-                    </div>
+                    ${isFiltered ? '<div class="reorder-instructions" style="background: #fff3cd; border-left: 4px solid #ffc107;"><p><strong>⚠️ Note:</strong> Clear search to reorder items (drag & drop disabled while filtering)</p></div>' : '<div class="reorder-instructions"><p><strong>💡 Tip:</strong> Drag and drop rows to reorder raffle items</p></div>'}
                     <table class="raffle-table">
                         <thead>
                             <tr>
@@ -353,7 +353,7 @@
                         </thead>
                         <tbody id="raffle-table-body">
                             ${raffles.map(raffle => `
-                                <tr draggable="true" data-raffle-id="${raffle.id}">
+                                <tr draggable="${!isFiltered}" data-raffle-id="${raffle.id}">
                                     <td><strong>#${raffle.number || '?'}</strong></td>
                                     <td class="drag-handle">⋮⋮</td>
                                     <td><img src="${raffle.image}" alt="${raffle.name}" style="max-width: 80px;"></td>
@@ -417,7 +417,13 @@
             const tbody = document.getElementById('raffle-table-body');
             if (!tbody) return;
 
+            // Only attach drag handlers to rows that are actually draggable
             const rows = tbody.querySelectorAll('tr[draggable="true"]');
+
+            if (rows.length === 0) {
+                // Drag and drop is disabled (search is active)
+                return;
+            }
 
             rows.forEach(row => {
                 row.addEventListener('dragstart', handleDragStart);

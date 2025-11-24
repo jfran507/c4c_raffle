@@ -225,18 +225,19 @@ app.put('/api/raffles/reorder', (req, res) => {
   const raffleMap = new Map();
   raffles.forEach(raffle => raffleMap.set(raffle.id, raffle));
 
-  // Reorder raffles and update numbers
-  const reorderedRaffles = orderedIds.map((id, index) => {
+  // Update only the numbers for the reordered items
+  orderedIds.forEach((id, index) => {
     const raffle = raffleMap.get(id);
     if (raffle) {
       raffle.number = index + 1;
-      return raffle;
     }
-    return null;
-  }).filter(r => r !== null);
+  });
 
-  if (writeData(DATA_FILE, reorderedRaffles)) {
-    res.json({ success: true, raffles: reorderedRaffles });
+  // Convert map back to array (preserves all items, even those not in orderedIds)
+  const allRaffles = Array.from(raffleMap.values());
+
+  if (writeData(DATA_FILE, allRaffles)) {
+    res.json({ success: true, raffles: allRaffles });
   } else {
     res.status(500).json({ success: false, message: 'Error reordering raffles' });
   }
