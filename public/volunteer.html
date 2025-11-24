@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Volunteer - Enter Winning Numbers</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <img src="/c4c-logo.png" alt="Carve 4 Cancer Logo" class="header-logo">
+            <div class="header-text">
+                <h1>Volunteer - Enter Winning Numbers</h1>
+                <p><a href="/index.html">Back to Raffle Display</a></p>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <div class="form-container">
+            <div id="login-form" class="auth-form">
+                <h2>Volunteer Login</h2>
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label for="login-username">Username:</label>
+                        <input type="text" id="login-username" value="volunteer" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="login-password">Password:</label>
+                        <input type="password" id="login-password" required>
+                    </div>
+                    <button type="submit" class="btn-primary">Login</button>
+                </form>
+                <div id="login-error" class="error-message"></div>
+                <p class="hint">Default password: carve4cancer</p>
+            </div>
+
+            <div id="winner-form" class="content-form" style="display: none;">
+                <h2>Enter Winning Raffle Numbers</h2>
+                <div id="raffles-container"></div>
+                <button type="button" class="btn-secondary" onclick="logout()">Logout</button>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let currentCredentials = null;
+
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('login-username').value;
+            const password = document.getElementById('login-password').value;
+
+            try {
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    currentCredentials = { username, password };
+                    document.getElementById('login-form').style.display = 'none';
+                    document.getElementById('winner-form').style.display = 'block';
+                    loadRaffles();
+                } else {
+                    document.getElementById('login-error').textContent = 'Invalid credentials';
+                }
+            } catch (error) {
+                document.getElementById('login-error').textContent = 'Login error. Please try again.';
+            }
+        });
+
+        async function loadRaffles() {
+            try {
+                const response = await fetch('/api/raffles');
+                const raffles = await response.json();
+
+                const container = document.getElementById('raffles-container');
+
+                if (raffles.length === 0) {
+                    container.innerHTML = '<p>No raffle items available yet.</p>';
+                    return;
+                }
+
+                container.innerHTML = raffles.map(raffle => `
+                    <div class="winner-card">
+                        <div class="winner-card-image">
+                            <img src="${raffle.image}" alt="${raffle.name}">
+                        </div>
+                        <div class="winner-card-content">
+                            <h3>${raffle.name}</h3>
+                            <p class="raffle-description">${raffle.description}</p>
+                            <div class="winner-form-group">
+                                <label for="winner-${raffle.id}">Winning Number:</label>
+                                <input
+                                    type="text"
+                                    id="winner-${raffle.id}"
+                                    value="${raffle.winningNumber || ''}"
+                                    placeholder="Enter winning number"
+                                >
+                                <button
+                                    class="btn-small"
+                                    onclick="updateWinner(${raffle.id})"
+                                >
+                                    ${raffle.winningNumber ? 'Update' : 'Set'} Winner
+                                </button>
+                            </div>
+                            <div id="message-${raffle.id}" class="form-message"></div>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading raffles:', error);
+                document.getElementById('raffles-container').innerHTML =
+                    '<div class="error">Error loading raffle items.</div>';
+            }
+        }
+
+        async function updateWinner(raffleId) {
+            const winningNumber = document.getElementById(`winner-${raffleId}`).value.trim();
+            const messageDiv = document.getElementById(`message-${raffleId}`);
+
+            if (!winningNumber) {
+                messageDiv.innerHTML = '<span class="error-message">Please enter a winning number</span>';
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/raffles/${raffleId}/winner`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: currentCredentials.username,
+                        password: currentCredentials.password,
+                        winningNumber
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    messageDiv.innerHTML = '<span class="success-message">Winner updated successfully!</span>';
+                    setTimeout(() => {
+                        messageDiv.innerHTML = '';
+                    }, 3000);
+                } else {
+                    messageDiv.innerHTML = `<span class="error-message">Error: ${result.message}</span>`;
+                }
+            } catch (error) {
+                messageDiv.innerHTML = '<span class="error-message">Error updating winner. Please try again.</span>';
+            }
+        }
+
+        function logout() {
+            currentCredentials = null;
+            document.getElementById('login-form').style.display = 'block';
+            document.getElementById('winner-form').style.display = 'none';
+            document.getElementById('loginForm').reset();
+            document.getElementById('login-error').textContent = '';
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Manage Raffle Items</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <img src="/c4c-logo.png" alt="Carve 4 Cancer Logo" class="header-logo">
+            <div class="header-text">
+                <h1>Admin - Manage Raffle Items</h1>
+                <p><a href="/index.html">Back to Raffle Display</a></p>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <div class="form-container">
+            <div id="login-form" class="auth-form">
+                <h2>Admin Login</h2>
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label for="login-username">Username:</label>
+                        <input type="text" id="login-username" value="admin" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="login-password">Password:</label>
+                        <input type="password" id="login-password" required>
+                    </div>
+                    <button type="submit" class="btn-primary">Login</button>
+                </form>
+                <div id="login-error" class="error-message"></div>
+                <p class="hint">Default password: carve4cancer</p>
+            </div>
+
+            <div id="raffle-form" class="content-form" style="display: none;">
+                <h2>Add New Raffle Item</h2>
+                <form id="addRaffleForm" enctype="multipart/form-data">
+                    <div class="form-group">
+                        <label for="raffle-name">Raffle Item Name: *</label>
+                        <input type="text" id="raffle-name" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="raffle-description">Description: *</label>
+                        <textarea id="raffle-description" rows="4" required></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Upload Picture: *</label>
+                        <div class="image-upload-tabs">
+                            <button type="button" class="tab-btn active" onclick="switchUploadTab('file')">Upload from File</button>
+                            <button type="button" class="tab-btn" onclick="switchUploadTab('url')">Add from URL</button>
+                        </div>
+                        <div id="file-upload-section" class="upload-section">
+                            <input type="file" id="raffle-image" accept="image/*">
+                        </div>
+                        <div id="url-upload-section" class="upload-section" style="display: none;">
+                            <input type="text" id="raffle-image-url" placeholder="Paste image URL (e.g., from Google Images)">
+                            <p class="hint">Right-click an image in Google Images and select "Copy image address"</p>
+                        </div>
+                        <div id="image-preview"></div>
+                    </div>
+
+                    <button type="submit" class="btn-primary">Add Raffle Item</button>
+                    <button type="button" class="btn-secondary" onclick="logout()">Logout</button>
+                </form>
+                <div id="form-message"></div>
+            </div>
+        </div>
+
+        <div id="raffle-list" style="display: none;">
+            <h2>Current Raffle Items</h2>
+            <div class="admin-search-container">
+                <input
+                    type="text"
+                    id="admin-search-input"
+                    placeholder="Search raffle items by name, description, or number..."
+                    autocomplete="off"
+                >
+                <span id="admin-search-count"></span>
+            </div>
+            <div id="raffles-list-container"></div>
+        </div>
+
+        <div id="rules-editor" style="display: none;">
+            <h2>Edit Raffle Rules & Information</h2>
+            <form id="editRulesForm">
+                <div class="form-group">
+                    <label for="rules-textarea">Rules Text:</label>
+                    <textarea id="rules-textarea" rows="10" required></textarea>
+                    <p class="hint">Use line breaks to separate lines. This will be displayed on the main raffle page.</p>
+                </div>
+                <button type="submit" class="btn-primary">Update Rules</button>
+            </form>
+            <div id="rules-form-message"></div>
+        </div>
+    </main>
+
+    <div id="edit-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close" onclick="closeEditModal()">&times;</span>
+            <h2>Edit Raffle Item</h2>
+            <form id="editRaffleForm" enctype="multipart/form-data">
+                <input type="hidden" id="edit-raffle-id">
+                <div class="form-group">
+                    <label for="edit-raffle-name">Raffle Item Name: *</label>
+                    <input type="text" id="edit-raffle-name" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="edit-raffle-description">Description: *</label>
+                    <textarea id="edit-raffle-description" rows="4" required></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Change Picture (optional):</label>
+                    <div class="image-upload-tabs">
+                        <button type="button" class="tab-btn active" onclick="switchEditUploadTab('file')">Upload from File</button>
+                        <button type="button" class="tab-btn" onclick="switchEditUploadTab('url')">Add from URL</button>
+                    </div>
+                    <div id="edit-file-upload-section" class="upload-section">
+                        <input type="file" id="edit-raffle-image" accept="image/*">
+                    </div>
+                    <div id="edit-url-upload-section" class="upload-section" style="display: none;">
+                        <input type="text" id="edit-raffle-image-url" placeholder="Paste image URL (e.g., from Google Images)">
+                        <p class="hint">Right-click an image in Google Images and select "Copy image address"</p>
+                    </div>
+                    <div id="edit-image-preview"></div>
+                </div>
+
+                <button type="submit" class="btn-primary">Update Raffle Item</button>
+                <button type="button" class="btn-secondary" onclick="closeEditModal()">Cancel</button>
+            </form>
+            <div id="edit-form-message"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentCredentials = null;
+        let currentUploadMode = 'file'; // 'file' or 'url'
+        let currentEditUploadMode = 'file';
+
+        function switchUploadTab(mode) {
+            currentUploadMode = mode;
+            const fileTabs = document.querySelectorAll('#raffle-form .tab-btn');
+            const fileSection = document.getElementById('file-upload-section');
+            const urlSection = document.getElementById('url-upload-section');
+            const fileInput = document.getElementById('raffle-image');
+            const urlInput = document.getElementById('raffle-image-url');
+
+            fileTabs.forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
+
+            if (mode === 'file') {
+                fileSection.style.display = 'block';
+                urlSection.style.display = 'none';
+                fileInput.required = true;
+                urlInput.required = false;
+                urlInput.value = '';
+            } else {
+                fileSection.style.display = 'none';
+                urlSection.style.display = 'block';
+                fileInput.required = false;
+                urlInput.required = true;
+                fileInput.value = '';
+            }
+            document.getElementById('image-preview').innerHTML = '';
+        }
+
+        function switchEditUploadTab(mode) {
+            currentEditUploadMode = mode;
+            const editTabs = document.querySelectorAll('#edit-modal .tab-btn');
+            const fileSection = document.getElementById('edit-file-upload-section');
+            const urlSection = document.getElementById('edit-url-upload-section');
+            const fileInput = document.getElementById('edit-raffle-image');
+            const urlInput = document.getElementById('edit-raffle-image-url');
+
+            editTabs.forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
+
+            if (mode === 'file') {
+                fileSection.style.display = 'block';
+                urlSection.style.display = 'none';
+                urlInput.value = '';
+            } else {
+                fileSection.style.display = 'none';
+                urlSection.style.display = 'block';
+                fileInput.value = '';
+            }
+        }
+
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('login-username').value;
+            const password = document.getElementById('login-password').value;
+
+            try {
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const result = await response.json();
+
+                if (result.success && result.role === 'admin') {
+                    currentCredentials = { username, password };
+                    document.getElementById('login-form').style.display = 'none';
+                    document.getElementById('raffle-form').style.display = 'block';
+                    document.getElementById('raffle-list').style.display = 'block';
+                    document.getElementById('rules-editor').style.display = 'block';
+                    loadRaffles();
+                    loadRules();
+                } else {
+                    document.getElementById('login-error').textContent =
+                        'Invalid credentials or not an admin account';
+                }
+            } catch (error) {
+                document.getElementById('login-error').textContent = 'Login error. Please try again.';
+            }
+        });
+
+        document.getElementById('raffle-image').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            const preview = document.getElementById('image-preview');
+
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    preview.innerHTML = `<img src="${e.target.result}" alt="Preview" style="max-width: 300px; margin-top: 10px;">`;
+                };
+                reader.readAsDataURL(file);
+            } else {
+                preview.innerHTML = '';
+            }
+        });
+
+        document.getElementById('raffle-image-url').addEventListener('input', (e) => {
+            const url = e.target.value.trim();
+            const preview = document.getElementById('image-preview');
+
+            if (url) {
+                preview.innerHTML = `<img src="${url}" alt="Preview" style="max-width: 300px; margin-top: 10px;" onerror="this.parentElement.innerHTML='<p class=\\'error-message\\'>Invalid image URL</p>'">`;
+            } else {
+                preview.innerHTML = '';
+            }
+        });
+
+        document.getElementById('addRaffleForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const formData = new FormData();
+            formData.append('username', currentCredentials.username);
+            formData.append('password', currentCredentials.password);
+            formData.append('name', document.getElementById('raffle-name').value);
+            formData.append('description', document.getElementById('raffle-description').value);
+
+            if (currentUploadMode === 'file') {
+                const fileInput = document.getElementById('raffle-image').files[0];
+                if (!fileInput) {
+                    document.getElementById('form-message').innerHTML =
+                        '<div class="error-message">Please select an image file</div>';
+                    return;
+                }
+                formData.append('image', fileInput);
+            } else {
+                const imageUrl = document.getElementById('raffle-image-url').value.trim();
+                if (!imageUrl) {
+                    document.getElementById('form-message').innerHTML =
+                        '<div class="error-message">Please enter an image URL</div>';
+                    return;
+                }
+                formData.append('imageUrl', imageUrl);
+            }
+
+            try {
+                const response = await fetch('/api/raffles', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    document.getElementById('form-message').innerHTML =
+                        '<div class="success-message">Raffle item added successfully!</div>';
+                    document.getElementById('addRaffleForm').reset();
+                    document.getElementById('image-preview').innerHTML = '';
+                    loadRaffles();
+
+                    setTimeout(() => {
+                        document.getElementById('form-message').innerHTML = '';
+                    }, 3000);
+                } else {
+                    document.getElementById('form-message').innerHTML =
+                        `<div class="error-message">Error: ${result.message}</div>`;
+                }
+            } catch (error) {
+                document.getElementById('form-message').innerHTML =
+                    '<div class="error-message">Error adding raffle item. Please try again.</div>';
+            }
+        });
+
+        let allAdminRaffles = [];
+
+        async function loadRaffles() {
+            try {
+                const response = await fetch('/api/raffles');
+                allAdminRaffles = await response.json();
+
+                displayAdminRaffles(allAdminRaffles);
+            } catch (error) {
+                console.error('Error loading raffles:', error);
+            }
+        }
+
+        function displayAdminRaffles(raffles) {
+            const container = document.getElementById('raffles-list-container');
+            const searchCount = document.getElementById('admin-search-count');
+
+            if (raffles.length === 0) {
+                container.innerHTML = '<p>No raffle items yet.</p>';
+                searchCount.textContent = '';
+                return;
+            }
+
+            const searchTerm = document.getElementById('admin-search-input').value;
+            if (searchTerm && raffles.length < allAdminRaffles.length) {
+                searchCount.textContent = `Showing ${raffles.length} of ${allAdminRaffles.length} items`;
+            } else {
+                searchCount.textContent = '';
+            }
+
+                container.innerHTML = `
+                    <div class="reorder-instructions">
+                        <p><strong>💡 Tip:</strong> Drag and drop rows to reorder raffle items</p>
+                    </div>
+                    <table class="raffle-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 40px;">#</th>
+                                <th style="width: 50px;">Drag</th>
+                                <th>Image</th>
+                                <th>Name</th>
+                                <th>Description</th>
+                                <th>Winning Number</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="raffle-table-body">
+                            ${raffles.map(raffle => `
+                                <tr draggable="true" data-raffle-id="${raffle.id}">
+                                    <td><strong>#${raffle.number || '?'}</strong></td>
+                                    <td class="drag-handle">⋮⋮</td>
+                                    <td><img src="${raffle.image}" alt="${raffle.name}" style="max-width: 80px;"></td>
+                                    <td>${raffle.name}</td>
+                                    <td>${raffle.description}</td>
+                                    <td>
+                                        <div class="winner-update-cell">
+                                            <input
+                                                type="tel"
+                                                inputmode="numeric"
+                                                pattern="[0-9]*"
+                                                id="winner-${raffle.id}"
+                                                value="${raffle.winningNumber || ''}"
+                                                placeholder="Enter number"
+                                                class="winner-input"
+                                            >
+                                            <button class="btn-action btn-winner" onclick="updateWinner(${raffle.id})">
+                                                ${raffle.winningNumber ? 'Update' : 'Set'} Winner
+                                            </button>
+                                        </div>
+                                        <div id="winner-message-${raffle.id}" class="winner-message"></div>
+                                    </td>
+                                    <td>
+                                        <button class="btn-action btn-edit" onclick='editRaffle(${JSON.stringify(raffle)})'>Edit</button>
+                                        <button class="btn-action btn-delete" onclick="deleteRaffle(${raffle.id}, '${raffle.name}')">Delete</button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+
+            // Initialize drag and drop
+            initializeDragAndDrop();
+        }
+
+        function searchAdminRaffles() {
+            const searchTerm = document.getElementById('admin-search-input').value.toLowerCase();
+
+            if (!searchTerm) {
+                displayAdminRaffles(allAdminRaffles);
+                return;
+            }
+
+            const filtered = allAdminRaffles.filter(raffle => {
+                const nameMatch = raffle.name.toLowerCase().includes(searchTerm);
+                const descriptionMatch = raffle.description.toLowerCase().includes(searchTerm);
+                const numberMatch = raffle.number && raffle.number.toString().includes(searchTerm);
+                const winnerMatch = raffle.winningNumber && raffle.winningNumber.toLowerCase().includes(searchTerm);
+                return nameMatch || descriptionMatch || numberMatch || winnerMatch;
+            });
+
+            displayAdminRaffles(filtered);
+        }
+
+        document.getElementById('admin-search-input').addEventListener('input', searchAdminRaffles);
+
+        let draggedRow = null;
+
+        function initializeDragAndDrop() {
+            const tbody = document.getElementById('raffle-table-body');
+            if (!tbody) return;
+
+            const rows = tbody.querySelectorAll('tr[draggable="true"]');
+
+            rows.forEach(row => {
+                row.addEventListener('dragstart', handleDragStart);
+                row.addEventListener('dragover', handleDragOver);
+                row.addEventListener('drop', handleDrop);
+                row.addEventListener('dragend', handleDragEnd);
+                row.addEventListener('dragenter', handleDragEnter);
+                row.addEventListener('dragleave', handleDragLeave);
+            });
+        }
+
+        function handleDragStart(e) {
+            draggedRow = this;
+            this.style.opacity = '0.5';
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/html', this.innerHTML);
+        }
+
+        function handleDragOver(e) {
+            if (e.preventDefault) {
+                e.preventDefault();
+            }
+            e.dataTransfer.dropEffect = 'move';
+            return false;
+        }
+
+        function handleDragEnter(e) {
+            if (this !== draggedRow) {
+                this.classList.add('drag-over');
+            }
+        }
+
+        function handleDragLeave(e) {
+            this.classList.remove('drag-over');
+        }
+
+        function handleDrop(e) {
+            if (e.stopPropagation) {
+                e.stopPropagation();
+            }
+
+            if (draggedRow !== this) {
+                const tbody = this.parentNode;
+                const allRows = Array.from(tbody.querySelectorAll('tr[draggable="true"]'));
+                const draggedIndex = allRows.indexOf(draggedRow);
+                const targetIndex = allRows.indexOf(this);
+
+                if (draggedIndex < targetIndex) {
+                    tbody.insertBefore(draggedRow, this.nextSibling);
+                } else {
+                    tbody.insertBefore(draggedRow, this);
+                }
+
+                // Save the new order
+                saveRaffleOrder();
+            }
+
+            this.classList.remove('drag-over');
+            return false;
+        }
+
+        function handleDragEnd(e) {
+            this.style.opacity = '1';
+
+            const rows = document.querySelectorAll('#raffle-table-body tr[draggable="true"]');
+            rows.forEach(row => {
+                row.classList.remove('drag-over');
+            });
+        }
+
+        async function saveRaffleOrder() {
+            const tbody = document.getElementById('raffle-table-body');
+            const rows = tbody.querySelectorAll('tr[draggable="true"]');
+            const orderedIds = Array.from(rows).map(row => parseInt(row.dataset.raffleId));
+
+            try {
+                const response = await fetch('/api/raffles/reorder', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: currentCredentials.username,
+                        password: currentCredentials.password,
+                        orderedIds
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Reload to show updated numbers
+                    loadRaffles();
+                } else {
+                    alert(`Error reordering: ${result.message}`);
+                }
+            } catch (error) {
+                console.error('Error saving order:', error);
+                alert('Error saving new order. Please try again.');
+            }
+        }
+
+        function editRaffle(raffle) {
+            document.getElementById('edit-raffle-id').value = raffle.id;
+            document.getElementById('edit-raffle-name').value = raffle.name;
+            document.getElementById('edit-raffle-description').value = raffle.description;
+            document.getElementById('edit-image-preview').innerHTML = `
+                <p style="margin-top: 10px;">Current image:</p>
+                <img src="${raffle.image}" alt="${raffle.name}" style="max-width: 300px;">
+            `;
+            document.getElementById('edit-modal').style.display = 'block';
+        }
+
+        function closeEditModal() {
+            document.getElementById('edit-modal').style.display = 'none';
+            document.getElementById('editRaffleForm').reset();
+            document.getElementById('edit-image-preview').innerHTML = '';
+            document.getElementById('edit-form-message').innerHTML = '';
+        }
+
+        document.getElementById('edit-raffle-image').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            const preview = document.getElementById('edit-image-preview');
+
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    preview.innerHTML = `
+                        <p style="margin-top: 10px;">New image preview:</p>
+                        <img src="${e.target.result}" alt="Preview" style="max-width: 300px;">
+                    `;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        document.getElementById('edit-raffle-image-url').addEventListener('input', (e) => {
+            const url = e.target.value.trim();
+            const preview = document.getElementById('edit-image-preview');
+
+            if (url) {
+                preview.innerHTML = `
+                    <p style="margin-top: 10px;">New image preview:</p>
+                    <img src="${url}" alt="Preview" style="max-width: 300px;" onerror="this.parentElement.innerHTML='<p class=\\'error-message\\'>Invalid image URL</p>'">
+                `;
+            }
+        });
+
+        document.getElementById('editRaffleForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const raffleId = document.getElementById('edit-raffle-id').value;
+            const formData = new FormData();
+            formData.append('username', currentCredentials.username);
+            formData.append('password', currentCredentials.password);
+            formData.append('name', document.getElementById('edit-raffle-name').value);
+            formData.append('description', document.getElementById('edit-raffle-description').value);
+
+            if (currentEditUploadMode === 'file') {
+                const imageFile = document.getElementById('edit-raffle-image').files[0];
+                if (imageFile) {
+                    formData.append('image', imageFile);
+                }
+            } else {
+                const imageUrl = document.getElementById('edit-raffle-image-url').value.trim();
+                if (imageUrl) {
+                    formData.append('imageUrl', imageUrl);
+                }
+            }
+
+            try {
+                const response = await fetch(`/api/raffles/${raffleId}`, {
+                    method: 'PUT',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    document.getElementById('edit-form-message').innerHTML =
+                        '<div class="success-message">Raffle item updated successfully!</div>';
+
+                    setTimeout(() => {
+                        closeEditModal();
+                        loadRaffles();
+                    }, 1500);
+                } else {
+                    document.getElementById('edit-form-message').innerHTML =
+                        `<div class="error-message">Error: ${result.message}</div>`;
+                }
+            } catch (error) {
+                document.getElementById('edit-form-message').innerHTML =
+                    '<div class="error-message">Error updating raffle item. Please try again.</div>';
+            }
+        });
+
+        async function deleteRaffle(raffleId, raffleName) {
+            if (!confirm(`Are you sure you want to delete "${raffleName}"? This cannot be undone.`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/raffles/${raffleId}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: currentCredentials.username,
+                        password: currentCredentials.password
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    loadRaffles();
+                } else {
+                    alert(`Error: ${result.message}`);
+                }
+            } catch (error) {
+                alert('Error deleting raffle item. Please try again.');
+            }
+        }
+
+        async function updateWinner(raffleId) {
+            const winningNumber = document.getElementById(`winner-${raffleId}`).value.trim();
+            const messageDiv = document.getElementById(`winner-message-${raffleId}`);
+
+            if (!winningNumber) {
+                messageDiv.innerHTML = '<span class="error-text">Please enter a winning number</span>';
+                setTimeout(() => messageDiv.innerHTML = '', 3000);
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/raffles/${raffleId}/winner`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: currentCredentials.username,
+                        password: currentCredentials.password,
+                        winningNumber
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    messageDiv.innerHTML = '<span class="success-text">Updated!</span>';
+                    setTimeout(() => {
+                        messageDiv.innerHTML = '';
+                        loadRaffles();
+                    }, 2000);
+                } else {
+                    messageDiv.innerHTML = `<span class="error-text">Error: ${result.message}</span>`;
+                    setTimeout(() => messageDiv.innerHTML = '', 3000);
+                }
+            } catch (error) {
+                messageDiv.innerHTML = '<span class="error-text">Error updating winner</span>';
+                setTimeout(() => messageDiv.innerHTML = '', 3000);
+            }
+        }
+
+        async function loadRules() {
+            try {
+                const response = await fetch('/api/rules');
+                const data = await response.json();
+                document.getElementById('rules-textarea').value = data.rules || '';
+            } catch (error) {
+                console.error('Error loading rules:', error);
+            }
+        }
+
+        document.getElementById('editRulesForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const rules = document.getElementById('rules-textarea').value;
+
+            try {
+                const response = await fetch('/api/rules', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: currentCredentials.username,
+                        password: currentCredentials.password,
+                        rules
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    document.getElementById('rules-form-message').innerHTML =
+                        '<div class="success-message">Rules updated successfully!</div>';
+
+                    setTimeout(() => {
+                        document.getElementById('rules-form-message').innerHTML = '';
+                    }, 3000);
+                } else {
+                    document.getElementById('rules-form-message').innerHTML =
+                        `<div class="error-message">Error: ${result.message}</div>`;
+                }
+            } catch (error) {
+                document.getElementById('rules-form-message').innerHTML =
+                    '<div class="error-message">Error updating rules. Please try again.</div>';
+            }
+        });
+
+        function logout() {
+            currentCredentials = null;
+            document.getElementById('login-form').style.display = 'block';
+            document.getElementById('raffle-form').style.display = 'none';
+            document.getElementById('raffle-list').style.display = 'none';
+            document.getElementById('rules-editor').style.display = 'none';
+            document.getElementById('loginForm').reset();
+            document.getElementById('login-error').textContent = '';
+        }
+    </script>
+</body>
+</html>

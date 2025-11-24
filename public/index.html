@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carve 4 Cancer - Raffle Items</title>
+    <link rel="stylesheet" href="styles-mobile-first.css">
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <img src="/c4c-logo.png" alt="Carve 4 Cancer Logo" class="header-logo">
+            <div class="header-text">
+                <h1>Carve 4 Cancer Raffle</h1>
+                <p>Shredding Blood Cancer!</p>
+            </div>
+        </div>
+    </header>
+
+    <div class="search-container">
+        <div class="search-wrapper">
+            <input
+                type="text"
+                id="search-input"
+                placeholder="Search raffle items by name or description..."
+                autocomplete="off"
+            >
+            <div id="search-dropdown" class="search-dropdown"></div>
+        </div>
+        <span id="search-count"></span>
+    </div>
+
+    <div class="ticket-checker-container">
+        <div class="ticket-checker">
+            <h3>Check Your Tickets</h3>
+            <p>Enter your ticket number(s) to see if you won!</p>
+            <div class="ticket-input-group">
+                <input
+                    type="text"
+                    id="ticket-input"
+                    placeholder="Enter ticket numbers (e.g., 123, 456, 789)"
+                    autocomplete="off"
+                >
+                <button id="check-tickets-btn" class="btn-check">Check Tickets</button>
+                <button id="clear-tickets-btn" class="btn-clear" style="display: none;">Clear</button>
+            </div>
+            <div id="ticket-results"></div>
+        </div>
+    </div>
+
+    <div class="rules-container">
+        <div class="rules-header" onclick="toggleRules()">
+            <h3>Raffle Rules & Information</h3>
+            <span id="rules-toggle-icon" class="toggle-icon">▼</span>
+        </div>
+        <div id="rules-content" class="rules-content" style="display: none;">
+            <div id="rules-text">Loading rules...</div>
+        </div>
+    </div>
+
+    <main>
+        <div id="raffles-container">
+            <div id="loading">Loading raffle items...</div>
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2025 Carve 4 Cancer. All rights reserved.</p>
+        <div class="admin-links">
+            <a href="/admin.html">Admin Portal</a>
+        </div>
+    </footer>
+
+    <script>
+        let allRaffles = [];
+        let userTickets = [];
+
+        async function loadRaffles() {
+            try {
+                const response = await fetch('/api/raffles');
+                allRaffles = await response.json();
+                displayRaffles(allRaffles);
+                if (userTickets.length > 0) {
+                    checkTickets();
+                }
+            } catch (error) {
+                console.error('Error loading raffles:', error);
+                document.getElementById('raffles-container').innerHTML =
+                    '<div class="error">Error loading raffle items. Please try again later.</div>';
+            }
+        }
+
+        function displayRaffles(raffles) {
+            const container = document.getElementById('raffles-container');
+            const searchCount = document.getElementById('search-count');
+
+            if (raffles.length === 0) {
+                container.innerHTML = '<div class="no-raffles">No raffle items yet. Check back soon!</div>';
+                searchCount.textContent = '';
+                return;
+            }
+
+            container.innerHTML = raffles.map(raffle => {
+                const isWinner = userTickets.length > 0 && raffle.winningNumber &&
+                                 userTickets.includes(raffle.winningNumber.toString());
+
+                return `
+                    <div class="raffle-card ${isWinner ? 'winner-highlight' : ''}">
+                        <div class="raffle-number">#${raffle.number || '?'}</div>
+                        ${isWinner ? '<div class="winner-badge">YOU WON!</div>' : ''}
+                        <div class="raffle-image">
+                            <img src="${raffle.image}" alt="${raffle.name}">
+                        </div>
+                        <div class="raffle-content">
+                            <h2>${raffle.name}</h2>
+                            <p class="raffle-description">${raffle.description}</p>
+                            <div class="winning-number">
+                                <strong>Winning Number:</strong>
+                                <span class="${raffle.winningNumber ? 'has-winner' : 'no-winner'}">
+                                    ${raffle.winningNumber || 'Not posted yet'}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            const searchTerm = document.getElementById('search-input').value;
+            if (searchTerm && raffles.length < allRaffles.length) {
+                searchCount.textContent = `Showing ${raffles.length} of ${allRaffles.length} items`;
+            } else {
+                searchCount.textContent = '';
+            }
+        }
+
+        function updateSearchDropdown() {
+            const searchTerm = document.getElementById('search-input').value.toLowerCase();
+            const dropdown = document.getElementById('search-dropdown');
+
+            if (!searchTerm || searchTerm.length < 2) {
+                dropdown.style.display = 'none';
+                return;
+            }
+
+            const filtered = allRaffles.filter(raffle => {
+                const nameMatch = raffle.name.toLowerCase().includes(searchTerm);
+                const descriptionMatch = raffle.description.toLowerCase().includes(searchTerm);
+                const winnerMatch = raffle.winningNumber && raffle.winningNumber.toLowerCase().includes(searchTerm);
+                return nameMatch || descriptionMatch || winnerMatch;
+            });
+
+            if (filtered.length === 0) {
+                dropdown.innerHTML = '<div class="dropdown-item no-results">No matching items found</div>';
+                dropdown.style.display = 'block';
+            } else {
+                dropdown.innerHTML = filtered.slice(0, 8).map(raffle => `
+                    <div class="dropdown-item" onclick="selectSearchItem('${raffle.id}')">
+                        <div class="dropdown-item-name">${raffle.name}</div>
+                        <div class="dropdown-item-desc">${raffle.description.substring(0, 60)}${raffle.description.length > 60 ? '...' : ''}</div>
+                    </div>
+                `).join('');
+                dropdown.style.display = 'block';
+            }
+        }
+
+        function selectSearchItem(raffleId) {
+            const raffle = allRaffles.find(r => r.id == raffleId);
+            if (raffle) {
+                document.getElementById('search-input').value = raffle.name;
+                document.getElementById('search-dropdown').style.display = 'none';
+                searchRaffles();
+
+                setTimeout(() => {
+                    const cards = document.querySelectorAll('.raffle-card');
+                    if (cards.length > 0) {
+                        cards[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                }, 100);
+            }
+        }
+
+        function searchRaffles() {
+            const searchTerm = document.getElementById('search-input').value.toLowerCase();
+
+            // Clear ticket filter when searching
+            if (searchTerm && userTickets.length > 0) {
+                userTickets = [];
+                document.getElementById('ticket-input').value = '';
+                document.getElementById('ticket-results').innerHTML = '';
+                document.getElementById('clear-tickets-btn').style.display = 'none';
+            }
+
+            if (!searchTerm) {
+                displayRaffles(allRaffles);
+                document.getElementById('search-dropdown').style.display = 'none';
+                return;
+            }
+
+            const filtered = allRaffles.filter(raffle => {
+                const nameMatch = raffle.name.toLowerCase().includes(searchTerm);
+                const descriptionMatch = raffle.description.toLowerCase().includes(searchTerm);
+                const winnerMatch = raffle.winningNumber && raffle.winningNumber.toLowerCase().includes(searchTerm);
+                return nameMatch || descriptionMatch || winnerMatch;
+            });
+
+            if (filtered.length === 0) {
+                document.getElementById('raffles-container').innerHTML =
+                    '<div class="no-raffles">No raffle items match your search.</div>';
+                document.getElementById('search-count').textContent = 'No matches found';
+            } else {
+                displayRaffles(filtered);
+            }
+        }
+
+        document.getElementById('search-input').addEventListener('input', () => {
+            updateSearchDropdown();
+            searchRaffles();
+        });
+
+        document.getElementById('search-input').addEventListener('focus', updateSearchDropdown);
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.search-wrapper')) {
+                document.getElementById('search-dropdown').style.display = 'none';
+            }
+        });
+
+        function checkTickets() {
+            const input = document.getElementById('ticket-input').value;
+            const resultsDiv = document.getElementById('ticket-results');
+            const container = document.getElementById('raffles-container');
+
+            if (!input.trim()) {
+                resultsDiv.innerHTML = '<p class="ticket-error">Please enter at least one ticket number.</p>';
+                return;
+            }
+
+            // Clear search when checking tickets
+            document.getElementById('search-input').value = '';
+            document.getElementById('search-count').textContent = '';
+
+            userTickets = input.split(',').map(t => t.trim()).filter(t => t);
+
+            const winners = allRaffles.filter(raffle =>
+                raffle.winningNumber && userTickets.includes(raffle.winningNumber.toString())
+            );
+
+            if (winners.length > 0) {
+                resultsDiv.innerHTML = `
+                    <div class="ticket-success">
+                        <h4>Congratulations! You won ${winners.length} item${winners.length > 1 ? 's' : ''}!</h4>
+                        <p>Showing only your winning items below.</p>
+                    </div>
+                `;
+                document.getElementById('clear-tickets-btn').style.display = 'inline-block';
+                displayRaffles(winners);
+            } else {
+                const hasUnpostedWinners = allRaffles.some(r => !r.winningNumber);
+                resultsDiv.innerHTML = `
+                    <div class="ticket-no-win">
+                        <p><strong>Sorry, no matching numbers found.</strong></p>
+                        ${hasUnpostedWinners ? '<p class="hint-text">Some winning numbers haven\'t been posted yet - check back soon!</p>' : ''}
+                    </div>
+                `;
+                document.getElementById('clear-tickets-btn').style.display = 'inline-block';
+                container.innerHTML = '<div class="no-raffles">No matching winning tickets for the numbers you entered.</div>';
+            }
+        }
+
+        function clearTickets() {
+            userTickets = [];
+            document.getElementById('ticket-input').value = '';
+            document.getElementById('ticket-results').innerHTML = '';
+            document.getElementById('clear-tickets-btn').style.display = 'none';
+            displayRaffles(allRaffles);
+        }
+
+        document.getElementById('check-tickets-btn').addEventListener('click', checkTickets);
+        document.getElementById('clear-tickets-btn').addEventListener('click', clearTickets);
+        document.getElementById('ticket-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                checkTickets();
+            }
+        });
+
+        async function loadRules() {
+            try {
+                const response = await fetch('/api/rules');
+                const data = await response.json();
+                const rulesText = data.rules || 'No rules available yet.';
+                document.getElementById('rules-text').innerHTML = rulesText.replace(/\n/g, '<br>');
+            } catch (error) {
+                console.error('Error loading rules:', error);
+                document.getElementById('rules-text').innerHTML = 'Error loading rules.';
+            }
+        }
+
+        function toggleRules() {
+            const content = document.getElementById('rules-content');
+            const icon = document.getElementById('rules-toggle-icon');
+
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                icon.textContent = '▲';
+            } else {
+                content.style.display = 'none';
+                icon.textContent = '▼';
+            }
+        }
+
+        loadRaffles();
+        loadRules();
+        setInterval(loadRaffles, 30000);
+        setInterval(loadRules, 60000);
+    </script>
+</body>
+</html>
