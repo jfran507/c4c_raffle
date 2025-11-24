@@ -56,7 +56,8 @@
                             <button type="button" class="tab-btn" onclick="switchUploadTab('url')">Add from URL</button>
                         </div>
                         <div id="file-upload-section" class="upload-section">
-                            <input type="file" id="raffle-image" accept="image/*">
+                            <input type="file" id="raffle-image" accept="image/*" capture="environment">
+                            <p class="hint">On mobile: Choose from photos or take a new picture</p>
                         </div>
                         <div id="url-upload-section" class="upload-section" style="display: none;">
                             <input type="text" id="raffle-image-url" placeholder="Paste image URL (e.g., from Google Images)">
@@ -123,7 +124,8 @@
                         <button type="button" class="tab-btn" onclick="switchEditUploadTab('url')">Add from URL</button>
                     </div>
                     <div id="edit-file-upload-section" class="upload-section">
-                        <input type="file" id="edit-raffle-image" accept="image/*">
+                        <input type="file" id="edit-raffle-image" accept="image/*" capture="environment">
+                        <p class="hint">On mobile: Choose from photos or take a new picture</p>
                     </div>
                     <div id="edit-url-upload-section" class="upload-section" style="display: none;">
                         <input type="text" id="edit-raffle-image-url" placeholder="Paste image URL (e.g., from Google Images)">
