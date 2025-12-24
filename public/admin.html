@@ -33,7 +33,6 @@
                     <button type="submit" class="btn-primary">Login</button>
                 </form>
                 <div id="login-error" class="error-message"></div>
-                <p class="hint">Default password: carve4cancer</p>
             </div>
 
             <div id="raffle-form" class="content-form" style="display: none;">
@@ -47,6 +46,11 @@
                     <div class="form-group">
                         <label for="raffle-description">Description: *</label>
                         <textarea id="raffle-description" rows="4" required></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="raffle-donated-by">Donated By:</label>
+                        <input type="text" id="raffle-donated-by" placeholder="Enter donor name (optional)">
                     </div>
 
                     <div class="form-group">
@@ -84,6 +88,16 @@
                 >
                 <span id="admin-search-count"></span>
             </div>
+            <div class="export-controls">
+                <div class="export-buttons">
+                    <button id="export-all-btn" class="btn-primary" onclick="exportAllToPDF()">
+                        Export All to PDF
+                    </button>
+                    <button id="export-selected-btn" class="btn-secondary" onclick="exportSelectedToPDF()" disabled>
+                        Export Selected (0)
+                    </button>
+                </div>
+            </div>
             <div id="raffles-list-container"></div>
         </div>
 
@@ -98,6 +112,31 @@
                 <button type="submit" class="btn-primary">Update Rules</button>
             </form>
             <div id="rules-form-message"></div>
+        </div>
+
+        <div id="sponsors-manager" style="display: none;">
+            <h2>Manage Sponsors</h2>
+            <form id="addSponsorForm" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label for="sponsor-name">Sponsor Name: *</label>
+                    <input type="text" id="sponsor-name" required>
+                </div>
+                <div class="form-group">
+                    <label for="sponsor-website">Website URL (optional):</label>
+                    <input type="text" id="sponsor-website" placeholder="https://example.com">
+                </div>
+                <div class="form-group">
+                    <label for="sponsor-logo">Logo Image: *</label>
+                    <input type="file" id="sponsor-logo" accept="image/*" required>
+                    <p class="hint">Recommended: PNG or SVG with transparent background</p>
+                </div>
+                <div id="sponsor-logo-preview"></div>
+                <button type="submit" class="btn-primary">Add Sponsor</button>
+            </form>
+            <div id="sponsor-form-message"></div>
+
+            <h3 style="margin-top: 2rem;">Current Sponsors</h3>
+            <div id="sponsors-list-container"></div>
         </div>
     </main>
 
@@ -115,6 +154,11 @@
                 <div class="form-group">
                     <label for="edit-raffle-description">Description: *</label>
                     <textarea id="edit-raffle-description" rows="4" required></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="edit-raffle-donated-by">Donated By:</label>
+                    <input type="text" id="edit-raffle-donated-by" placeholder="Enter donor name (optional)">
                 </div>
 
                 <div class="form-group">
@@ -215,8 +259,10 @@
                     document.getElementById('raffle-form').style.display = 'block';
                     document.getElementById('raffle-list').style.display = 'block';
                     document.getElementById('rules-editor').style.display = 'block';
+                    document.getElementById('sponsors-manager').style.display = 'block';
                     loadRaffles();
                     loadRules();
+                    loadSponsors();
                 } else {
                     document.getElementById('login-error').textContent =
                         'Invalid credentials or not an admin account';
@@ -267,6 +313,7 @@
             formData.append('password', currentCredentials.password);
             formData.append('name', document.getElementById('raffle-name').value);
             formData.append('description', document.getElementById('raffle-description').value);
+            formData.append('donatedBy', document.getElementById('raffle-donated-by').value);
 
             if (currentUploadMode === 'file') {
                 const fileInput = document.getElementById('raffle-image').files[0];
@@ -366,6 +413,7 @@
                     <table class="raffle-table">
                         <thead>
                             <tr>
+                                <th style="width: 40px;"><input type="checkbox" id="header-select-all" onchange="toggleSelectAll()" title="Select all"></th>
                                 <th style="width: 40px;">#</th>
                                 <th style="width: 50px;">Drag</th>
                                 <th>Image</th>
@@ -378,6 +426,7 @@
                         <tbody id="raffle-table-body">
                             ${raffles.map(raffle => `
                                 <tr draggable="${!isFiltered}" data-raffle-id="${raffle.id}">
+                                    <td><input type="checkbox" class="raffle-select" data-raffle-id="${raffle.id}" onchange="updateExportButton()"></td>
                                     <td><strong>#${raffle.number || '?'}</strong></td>
                                     <td class="drag-handle">⋮⋮</td>
                                     <td><img src="${raffle.image}" alt="${raffle.name}" style="max-width: 80px;"></td>
@@ -552,6 +601,7 @@
             document.getElementById('edit-raffle-id').value = raffle.id;
             document.getElementById('edit-raffle-name').value = raffle.name;
             document.getElementById('edit-raffle-description').value = raffle.description;
+            document.getElementById('edit-raffle-donated-by').value = raffle.donatedBy || '';
             document.getElementById('edit-image-preview').innerHTML = `
                 <p style="margin-top: 10px;">Current image:</p>
                 <img src="${raffle.image}" alt="${raffle.name}" style="max-width: 300px;">
@@ -603,6 +653,7 @@
             formData.append('password', currentCredentials.password);
             formData.append('name', document.getElementById('edit-raffle-name').value);
             formData.append('description', document.getElementById('edit-raffle-description').value);
+            formData.append('donatedBy', document.getElementById('edit-raffle-donated-by').value);
 
             if (currentEditUploadMode === 'file') {
                 const imageFile = document.getElementById('edit-raffle-image').files[0];
@@ -754,8 +805,454 @@
             document.getElementById('raffle-form').style.display = 'none';
             document.getElementById('raffle-list').style.display = 'none';
             document.getElementById('rules-editor').style.display = 'none';
+            document.getElementById('sponsors-manager').style.display = 'none';
             document.getElementById('loginForm').reset();
             document.getElementById('login-error').textContent = '';
+        }
+
+        // Sponsor management functions
+        async function loadSponsors() {
+            try {
+                const response = await fetch('/api/sponsors');
+                const sponsors = await response.json();
+                displaySponsors(sponsors);
+            } catch (error) {
+                console.error('Error loading sponsors:', error);
+            }
+        }
+
+        function displaySponsors(sponsors) {
+            const container = document.getElementById('sponsors-list-container');
+
+            if (sponsors.length === 0) {
+                container.innerHTML = '<p class="no-items">No sponsors added yet.</p>';
+                return;
+            }
+
+            container.innerHTML = `
+                <div class="sponsors-grid">
+                    ${sponsors.map(sponsor => `
+                        <div class="sponsor-card">
+                            <img src="${sponsor.logo}" alt="${sponsor.name}" class="sponsor-logo-preview">
+                            <div class="sponsor-info">
+                                <strong>${sponsor.name}</strong>
+                                ${sponsor.websiteUrl ? `<br><a href="${sponsor.websiteUrl}" target="_blank" class="sponsor-link">${sponsor.websiteUrl}</a>` : ''}
+                            </div>
+                            <button class="btn-delete" onclick="deleteSponsor(${sponsor.id})">Delete</button>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        document.getElementById('sponsor-logo').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            const preview = document.getElementById('sponsor-logo-preview');
+
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    preview.innerHTML = `<img src="${e.target.result}" alt="Preview" style="max-width: 200px; max-height: 100px; margin-top: 10px;">`;
+                };
+                reader.readAsDataURL(file);
+            } else {
+                preview.innerHTML = '';
+            }
+        });
+
+        document.getElementById('addSponsorForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const formData = new FormData();
+            formData.append('username', currentCredentials.username);
+            formData.append('password', currentCredentials.password);
+            formData.append('name', document.getElementById('sponsor-name').value);
+            formData.append('websiteUrl', document.getElementById('sponsor-website').value);
+            formData.append('logo', document.getElementById('sponsor-logo').files[0]);
+
+            try {
+                const response = await fetch('/api/sponsors', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    document.getElementById('sponsor-form-message').innerHTML =
+                        '<div class="success-message">Sponsor added successfully!</div>';
+                    document.getElementById('addSponsorForm').reset();
+                    document.getElementById('sponsor-logo-preview').innerHTML = '';
+                    loadSponsors();
+
+                    setTimeout(() => {
+                        document.getElementById('sponsor-form-message').innerHTML = '';
+                    }, 3000);
+                } else {
+                    document.getElementById('sponsor-form-message').innerHTML =
+                        `<div class="error-message">Error: ${result.message}</div>`;
+                }
+            } catch (error) {
+                document.getElementById('sponsor-form-message').innerHTML =
+                    '<div class="error-message">Error adding sponsor. Please try again.</div>';
+            }
+        });
+
+        async function deleteSponsor(sponsorId) {
+            if (!confirm('Are you sure you want to delete this sponsor?')) return;
+
+            try {
+                const response = await fetch(`/api/sponsors/${sponsorId}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: currentCredentials.username,
+                        password: currentCredentials.password
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    loadSponsors();
+                } else {
+                    alert('Error deleting sponsor: ' + result.message);
+                }
+            } catch (error) {
+                alert('Error deleting sponsor. Please try again.');
+            }
+        }
+
+        // ==================== PDF Export Functions ====================
+
+        const PDF_CONFIG = {
+            // Page dimensions (8.5" x 11" in points, 72 points per inch)
+            pageWidth: 612,
+            pageHeight: 792,
+
+            // Card dimensions (quarter page)
+            cardWidth: 306,
+            cardHeight: 396,
+
+            // Template image dimensions
+            templateWidth: 1500,
+            templateHeight: 1500,
+
+            // Content area positioning (relative to template, in pixels)
+            contentStartY: 620,
+            contentPadding: 80,
+
+            // QR code settings
+            qrSize: 150,
+            qrMargin: 50,
+
+            // QR code URL
+            qrUrl: 'https://raffle.carve4cancer.com'
+        };
+
+        // Load external libraries dynamically
+        function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                if (document.querySelector(`script[src="${src}"]`)) {
+                    resolve();
+                    return;
+                }
+                const script = document.createElement('script');
+                script.src = src;
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        }
+
+        async function loadPDFLibraries() {
+            await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+        }
+
+        // Generate QR code using free API
+        function generateQRCodeUrl() {
+            const size = PDF_CONFIG.qrSize;
+            const data = encodeURIComponent(PDF_CONFIG.qrUrl);
+            return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${data}&margin=0`;
+        }
+
+        // Load QR code image
+        function loadQRCodeImage() {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => resolve(img);
+                img.onerror = () => reject(new Error('Failed to load QR code'));
+                img.src = generateQRCodeUrl();
+            });
+        }
+
+        // Load template image
+        function loadTemplateImage() {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => resolve(img);
+                img.onerror = () => reject(new Error('Failed to load template image'));
+                img.src = '/assets/pdf-template.png';
+            });
+        }
+
+        // Text wrapping helper
+        function wrapText(ctx, text, maxWidth) {
+            const words = text.split(' ');
+            const lines = [];
+            let currentLine = '';
+
+            words.forEach(word => {
+                const testLine = currentLine ? `${currentLine} ${word}` : word;
+                const metrics = ctx.measureText(testLine);
+
+                if (metrics.width > maxWidth && currentLine) {
+                    lines.push(currentLine);
+                    currentLine = word;
+                } else {
+                    currentLine = testLine;
+                }
+            });
+
+            if (currentLine) {
+                lines.push(currentLine);
+            }
+
+            return lines;
+        }
+
+        // Create single card as canvas
+        async function createCardCanvas(raffle, templateImg, qrImg) {
+            const canvas = document.createElement('canvas');
+            canvas.width = PDF_CONFIG.templateWidth;
+            canvas.height = PDF_CONFIG.templateHeight;
+            const ctx = canvas.getContext('2d');
+
+            // Draw template background
+            ctx.drawImage(templateImg, 0, 0);
+
+            // Set up text rendering
+            ctx.textAlign = 'center';
+            const centerX = canvas.width / 2;
+            let currentY = PDF_CONFIG.contentStartY;
+
+            // Draw Item Number (subtle label)
+            ctx.font = 'italic 52px Georgia, serif';
+            ctx.fillStyle = '#1a5f7a';
+            ctx.fillText(`Item #${raffle.number}`, centerX, currentY);
+            currentY += 120;
+
+            // Draw Item Name - DOMINANT headline (bold, no italic)
+            ctx.font = 'bold 95px Georgia, serif';
+            ctx.fillStyle = '#1a5f7a';
+            const maxNameWidth = canvas.width - PDF_CONFIG.contentPadding * 2;
+            const nameLines = wrapText(ctx, raffle.name, maxNameWidth);
+            const maxNameLines = 2;
+            nameLines.slice(0, maxNameLines).forEach((line, i) => {
+                if (i === maxNameLines - 1 && nameLines.length > maxNameLines) {
+                    line = line.slice(0, -3) + '...';
+                }
+                ctx.fillText(line, centerX, currentY);
+                currentY += 110;
+            });
+            currentY += 40;
+
+            // Draw Description (readable body text)
+            ctx.font = '46px Georgia, serif';
+            ctx.fillStyle = '#1a5f7a';
+            const maxDescWidth = canvas.width - PDF_CONFIG.contentPadding * 2;
+            const descLines = wrapText(ctx, raffle.description, maxDescWidth);
+            const maxDescLines = 4;
+            descLines.slice(0, maxDescLines).forEach((line, i) => {
+                if (i === maxDescLines - 1 && descLines.length > maxDescLines) {
+                    line = line.slice(0, -3) + '...';
+                }
+                ctx.fillText(line, centerX, currentY);
+                currentY += 58;
+            });
+
+            // Draw Donor info (if present) - prominent donor name
+            if (raffle.donatedBy) {
+                currentY = canvas.height - PDF_CONFIG.qrMargin - PDF_CONFIG.qrSize - 120;
+                ctx.font = '36px Georgia, serif';
+                ctx.fillStyle = '#333333';
+                ctx.fillText('Donated by', centerX, currentY);
+                currentY += 60;
+                ctx.font = 'bold 52px Georgia, serif';
+                ctx.fillText(raffle.donatedBy, centerX, currentY);
+            }
+
+            // Draw QR code in bottom right
+            const qrX = canvas.width - PDF_CONFIG.qrMargin - PDF_CONFIG.qrSize;
+            const qrY = canvas.height - PDF_CONFIG.qrMargin - PDF_CONFIG.qrSize;
+
+            // Draw white background for QR code
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(qrX - 8, qrY - 8, PDF_CONFIG.qrSize + 16, PDF_CONFIG.qrSize + 16);
+            ctx.strokeStyle = '#cccccc';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(qrX - 8, qrY - 8, PDF_CONFIG.qrSize + 16, PDF_CONFIG.qrSize + 16);
+
+            ctx.drawImage(qrImg, qrX, qrY, PDF_CONFIG.qrSize, PDF_CONFIG.qrSize);
+
+            return canvas;
+        }
+
+        // Show loading overlay
+        function showLoadingOverlay(total) {
+            const loadingDiv = document.createElement('div');
+            loadingDiv.id = 'pdf-loading';
+            loadingDiv.innerHTML = `
+                <div class="pdf-loading-overlay">
+                    <div class="pdf-loading-content">
+                        <div class="pdf-spinner"></div>
+                        <p>Generating PDF...</p>
+                        <p class="pdf-progress">0 / ${total} cards</p>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(loadingDiv);
+            return loadingDiv;
+        }
+
+        // Update loading progress
+        function updateLoadingProgress(current, total) {
+            const progressEl = document.querySelector('.pdf-progress');
+            if (progressEl) {
+                progressEl.textContent = `${current} / ${total} cards`;
+            }
+        }
+
+        // Remove loading overlay
+        function hideLoadingOverlay() {
+            const loadingDiv = document.getElementById('pdf-loading');
+            if (loadingDiv) {
+                loadingDiv.remove();
+            }
+        }
+
+        // Main export function
+        async function generatePDF(raffles) {
+            if (raffles.length === 0) {
+                alert('No raffle items to export.');
+                return;
+            }
+
+            const loadingDiv = showLoadingOverlay(raffles.length);
+
+            try {
+                await loadPDFLibraries();
+
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF({
+                    orientation: 'portrait',
+                    unit: 'pt',
+                    format: 'letter'
+                });
+
+                const templateImg = await loadTemplateImage();
+                const qrImg = await loadQRCodeImage();
+
+                // 2x2 grid positions
+                const positions = [
+                    { x: 0, y: 0 },                                      // Top left
+                    { x: PDF_CONFIG.cardWidth, y: 0 },                   // Top right
+                    { x: 0, y: PDF_CONFIG.cardHeight },                  // Bottom left
+                    { x: PDF_CONFIG.cardWidth, y: PDF_CONFIG.cardHeight } // Bottom right
+                ];
+
+                // Process raffles in groups of 4 (one page)
+                const totalPages = Math.ceil(raffles.length / 4);
+
+                for (let pageIndex = 0; pageIndex < totalPages; pageIndex++) {
+                    if (pageIndex > 0) {
+                        pdf.addPage();
+                    }
+
+                    const pageRaffles = raffles.slice(pageIndex * 4, (pageIndex + 1) * 4);
+
+                    for (let i = 0; i < pageRaffles.length; i++) {
+                        const raffle = pageRaffles[i];
+                        const pos = positions[i];
+
+                        // Create card canvas
+                        const cardCanvas = await createCardCanvas(raffle, templateImg, qrImg);
+                        const cardDataUrl = cardCanvas.toDataURL('image/png');
+
+                        // Add to PDF
+                        pdf.addImage(
+                            cardDataUrl,
+                            'PNG',
+                            pos.x,
+                            pos.y,
+                            PDF_CONFIG.cardWidth,
+                            PDF_CONFIG.cardHeight
+                        );
+
+                        // Update progress
+                        const processed = pageIndex * 4 + i + 1;
+                        updateLoadingProgress(processed, raffles.length);
+                    }
+                }
+
+                // Generate filename with date
+                const date = new Date().toISOString().split('T')[0];
+                const filename = `C4C_Raffle_Cards_${date}.pdf`;
+
+                pdf.save(filename);
+
+            } catch (error) {
+                console.error('PDF generation failed:', error);
+                alert('Failed to generate PDF: ' + error.message);
+            } finally {
+                hideLoadingOverlay();
+            }
+        }
+
+        // Export all raffles
+        async function exportAllToPDF() {
+            await generatePDF(allAdminRaffles);
+        }
+
+        // Export selected raffles
+        async function exportSelectedToPDF() {
+            const selectedIds = getSelectedRaffleIds();
+            if (selectedIds.length === 0) {
+                alert('Please select at least one raffle item to export.');
+                return;
+            }
+            const selectedRaffles = allAdminRaffles.filter(r => selectedIds.includes(r.id));
+            await generatePDF(selectedRaffles);
+        }
+
+        // Selection helpers
+        function getSelectedRaffleIds() {
+            const checkboxes = document.querySelectorAll('.raffle-select:checked');
+            return Array.from(checkboxes).map(cb => parseInt(cb.dataset.raffleId));
+        }
+
+        function updateExportButton() {
+            const selectedCount = getSelectedRaffleIds().length;
+            const btn = document.getElementById('export-selected-btn');
+            btn.disabled = selectedCount === 0;
+            btn.textContent = `Export Selected (${selectedCount})`;
+
+            // Update header checkbox state
+            const allCheckboxes = document.querySelectorAll('.raffle-select');
+            const headerCheckbox = document.getElementById('header-select-all');
+            if (headerCheckbox && allCheckboxes.length > 0) {
+                headerCheckbox.checked = selectedCount === allCheckboxes.length;
+                headerCheckbox.indeterminate = selectedCount > 0 && selectedCount < allCheckboxes.length;
+            }
+        }
+
+        function toggleSelectAll() {
+            const headerCheckbox = document.getElementById('header-select-all');
+            const checkboxes = document.querySelectorAll('.raffle-select');
+            checkboxes.forEach(cb => cb.checked = headerCheckbox.checked);
+            updateExportButton();
         }
     </script>
 </body>

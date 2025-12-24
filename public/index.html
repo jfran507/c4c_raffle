@@ -4,6 +4,26 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Carve 4 Cancer - Raffle Items</title>
+    <meta name="description" content="Check your raffle tickets and browse amazing prizes at the Carve 4 Cancer Raffle. Shredding Blood Cancer!">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/c4c-logo.png">
+    <link rel="apple-touch-icon" href="/c4c-logo.png">
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://raffle.carve4cancer.com/">
+    <meta property="og:title" content="Carve 4 Cancer Raffle">
+    <meta property="og:description" content="Check your raffle tickets and browse amazing prizes. Shredding Blood Cancer!">
+    <meta property="og:image" content="https://raffle.carve4cancer.com/c4c-logo.png">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://raffle.carve4cancer.com/">
+    <meta name="twitter:title" content="Carve 4 Cancer Raffle">
+    <meta name="twitter:description" content="Check your raffle tickets and browse amazing prizes. Shredding Blood Cancer!">
+    <meta name="twitter:image" content="https://raffle.carve4cancer.com/c4c-logo.png">
+
     <link rel="stylesheet" href="styles-mobile-first.css">
 </head>
 <body>
@@ -44,6 +64,7 @@
                 <button id="check-tickets-btn" class="btn-check">Check Tickets</button>
                 <button id="clear-tickets-btn" class="btn-clear" style="display: none;">Clear</button>
             </div>
+            <div id="checker-status"></div>
             <div id="ticket-results"></div>
         </div>
     </div>
@@ -64,6 +85,15 @@
         </div>
     </main>
 
+    <section id="sponsors-section" class="sponsors-section" style="display: none;">
+        <h2>Our Sponsors</h2>
+        <div class="sponsors-carousel-container">
+            <div class="sponsors-carousel" id="sponsors-carousel">
+                <!-- Sponsors will be loaded here -->
+            </div>
+        </div>
+    </section>
+
     <footer>
         <p>&copy; 2025 Carve 4 Cancer. All rights reserved.</p>
         <div class="admin-links">
@@ -80,6 +110,7 @@
                 const response = await fetch('/api/raffles');
                 allRaffles = await response.json();
                 displayRaffles(allRaffles);
+                updateTicketCheckerState();
                 if (userTickets.length > 0) {
                     checkTickets();
                 }
@@ -87,6 +118,31 @@
                 console.error('Error loading raffles:', error);
                 document.getElementById('raffles-container').innerHTML =
                     '<div class="error">Error loading raffle items. Please try again later.</div>';
+            }
+        }
+
+        function updateTicketCheckerState() {
+            const drawnCount = allRaffles.filter(r => r.winningNumber).length;
+            const totalCount = allRaffles.length;
+            const statusDiv = document.getElementById('checker-status');
+            const checkBtn = document.getElementById('check-tickets-btn');
+            const ticketInput = document.getElementById('ticket-input');
+
+            if (totalCount === 0) {
+                // No raffles yet
+                checkBtn.disabled = true;
+                ticketInput.disabled = true;
+                statusDiv.innerHTML = '<p class="checker-blocked">No raffle items yet - check back soon!</p>';
+            } else if (drawnCount === 0) {
+                // No winners drawn yet - disable checking
+                checkBtn.disabled = true;
+                ticketInput.disabled = true;
+                statusDiv.innerHTML = '<p class="checker-blocked">Winners haven\'t been drawn yet - check back soon!</p>';
+            } else {
+                // Some winners drawn - enable and show progress
+                checkBtn.disabled = false;
+                ticketInput.disabled = false;
+                statusDiv.innerHTML = `<p class="checker-progress">${drawnCount} of ${totalCount} winners posted</p>`;
             }
         }
 
@@ -113,7 +169,9 @@
                         </div>
                         <div class="raffle-content">
                             <h2>${raffle.name}</h2>
-                            <p class="raffle-description">${raffle.description}</p>
+                            ${raffle.donatedBy ? `<p class="donated-by">Donated by <span class="donor-name">${raffle.donatedBy}</span></p>` : ''}
+                            <p class="raffle-description" id="desc-${raffle.id}">${raffle.description}</p>
+                            <button class="read-more-btn" onclick="toggleDescription(${raffle.id})" id="btn-${raffle.id}" style="display: none;">Read more</button>
                             <div class="winning-number">
                                 <strong>Winning Number:</strong>
                                 <span class="${raffle.winningNumber ? 'has-winner' : 'no-winner'}">
@@ -131,6 +189,36 @@
             } else {
                 searchCount.textContent = '';
             }
+
+            // Check which descriptions need "Read more" button
+            setTimeout(checkTruncation, 50);
+        }
+
+        function toggleDescription(raffleId) {
+            const desc = document.getElementById('desc-' + raffleId);
+            const btn = document.getElementById('btn-' + raffleId);
+
+            if (desc.classList.contains('expanded')) {
+                desc.classList.remove('expanded');
+                btn.textContent = 'Read more';
+            } else {
+                desc.classList.add('expanded');
+                btn.textContent = 'Show less';
+            }
+        }
+
+        function checkTruncation() {
+            document.querySelectorAll('.raffle-description').forEach(desc => {
+                const id = desc.id.replace('desc-', '');
+                const btn = document.getElementById('btn-' + id);
+                if (btn) {
+                    if (desc.scrollHeight > desc.clientHeight + 1) {
+                        btn.style.display = 'inline';
+                    } else {
+                        btn.style.display = 'none';
+                    }
+                }
+            });
         }
 
         function updateSearchDropdown() {
@@ -255,11 +343,12 @@
                 document.getElementById('clear-tickets-btn').style.display = 'inline-block';
                 displayRaffles(winners);
             } else {
-                const hasUnpostedWinners = allRaffles.some(r => !r.winningNumber);
+                const drawnCount = allRaffles.filter(r => r.winningNumber).length;
+                const totalCount = allRaffles.length;
                 resultsDiv.innerHTML = `
                     <div class="ticket-no-win">
                         <p><strong>Sorry, no matching numbers found.</strong></p>
-                        ${hasUnpostedWinners ? '<p class="hint-text">Some winning numbers haven\'t been posted yet - check back soon!</p>' : ''}
+                        ${drawnCount < totalCount ? `<p class="hint-text">${drawnCount} of ${totalCount} winning numbers posted - check back for more!</p>` : ''}
                     </div>
                 `;
                 document.getElementById('clear-tickets-btn').style.display = 'inline-block';
@@ -312,6 +401,51 @@
         loadRules();
         setInterval(loadRaffles, 30000);
         setInterval(loadRules, 60000);
+
+        // Load and display sponsors
+        async function loadSponsors() {
+            try {
+                const response = await fetch('/api/sponsors');
+                const sponsors = await response.json();
+                displaySponsors(sponsors);
+            } catch (error) {
+                console.error('Error loading sponsors:', error);
+            }
+        }
+
+        function displaySponsors(sponsors) {
+            const section = document.getElementById('sponsors-section');
+            const carousel = document.getElementById('sponsors-carousel');
+
+            if (sponsors.length === 0) {
+                section.style.display = 'none';
+                return;
+            }
+
+            section.style.display = 'block';
+
+            // Duplicate sponsors for seamless infinite scroll
+            const sponsorItems = sponsors.map(sponsor => `
+                <div class="sponsor-item">
+                    ${sponsor.websiteUrl
+                        ? `<a href="${sponsor.websiteUrl}" target="_blank" rel="noopener noreferrer">
+                               <img src="${sponsor.logo}" alt="${sponsor.name}" title="${sponsor.name}">
+                           </a>`
+                        : `<img src="${sponsor.logo}" alt="${sponsor.name}" title="${sponsor.name}">`
+                    }
+                </div>
+            `).join('');
+
+            // Duplicate the content for seamless looping
+            carousel.innerHTML = sponsorItems + sponsorItems;
+
+            // Adjust animation duration based on number of sponsors
+            const duration = Math.max(sponsors.length * 3, 15);
+            carousel.style.animationDuration = duration + 's';
+        }
+
+        loadSponsors();
+        setInterval(loadSponsors, 60000);
     </script>
 </body>
 </html>

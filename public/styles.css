@@ -1098,3 +1098,151 @@ footer {
         font-size: 0.9rem;
     }
 }
+
+/* Sponsor Management Styles */
+.sponsors-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.sponsor-card {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.sponsor-logo-preview {
+    max-width: 150px;
+    max-height: 80px;
+    object-fit: contain;
+}
+
+.sponsor-info {
+    text-align: center;
+    font-size: 0.9rem;
+}
+
+.sponsor-link {
+    color: #498cb1;
+    font-size: 0.8rem;
+    word-break: break-all;
+}
+
+.no-items {
+    color: #666;
+    font-style: italic;
+    text-align: center;
+    padding: 2rem;
+}
+
+/* PDF Export Controls */
+.export-controls {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    border: 1px solid #e0e0e0;
+}
+
+.export-buttons {
+    display: flex;
+    gap: 1rem;
+}
+
+.export-controls .btn-primary,
+.export-controls .btn-secondary {
+    width: auto;
+    margin-bottom: 0;
+    padding: 0.6rem 1.25rem;
+    font-size: 0.95rem;
+}
+
+.export-controls .btn-secondary:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* PDF Loading Overlay */
+.pdf-loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+}
+
+.pdf-loading-content {
+    background: white;
+    padding: 2.5rem;
+    border-radius: 12px;
+    text-align: center;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.pdf-spinner {
+    width: 50px;
+    height: 50px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #498cb1;
+    border-radius: 50%;
+    animation: pdf-spin 1s linear infinite;
+    margin: 0 auto 1.5rem;
+}
+
+@keyframes pdf-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.pdf-loading-content p {
+    margin: 0;
+    font-size: 1.1rem;
+    color: #333;
+}
+
+.pdf-loading-content .pdf-progress {
+    color: #666;
+    font-size: 0.95rem;
+    margin-top: 0.75rem;
+}
+
+/* Checkbox styling in table header */
+.raffle-table th input[type="checkbox"],
+.raffle-table td input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+@media (max-width: 768px) {
+    .export-controls {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .export-buttons {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .export-controls .btn-primary,
+    .export-controls .btn-secondary {
+        width: 100%;
+    }
+}

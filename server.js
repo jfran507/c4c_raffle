@@ -17,6 +17,14 @@ app.use('/uploads', express.static(path.join(__dirname, 'data', 'uploads')));
 const DATA_FILE = path.join(__dirname, 'data', 'raffles.json');
 const USERS_FILE = path.join(__dirname, 'data', 'users.json');
 const RULES_FILE = path.join(__dirname, 'data', 'rules.json');
+const SPONSORS_FILE = path.join(__dirname, 'data', 'sponsors.json');
+
+// Admin usernames (case-insensitive)
+const ADMIN_USERS = ['admin', 'joanne'];
+
+function isAdmin(username) {
+  return ADMIN_USERS.includes(username.toLowerCase());
+}
 
 if (!fs.existsSync('data')) {
   fs.mkdirSync('data');
@@ -58,10 +66,11 @@ function readData(file) {
       const data = fs.readFileSync(file, 'utf8');
       return JSON.parse(data);
     }
-    return file === DATA_FILE ? [] : {};
+    // Return empty array for raffles and sponsors, empty object for others
+    return (file === DATA_FILE || file === SPONSORS_FILE) ? [] : {};
   } catch (error) {
     console.error('Error reading data:', error);
-    return file === DATA_FILE ? [] : {};
+    return (file === DATA_FILE || file === SPONSORS_FILE) ? [] : {};
   }
 }
 
@@ -148,12 +157,12 @@ function downloadImageFromUrl(url, callback) {
 }
 
 if (!fs.existsSync(USERS_FILE)) {
-  const defaultPassword = bcrypt.hashSync('carve4cancer', 10);
+  const defaultPassword = bcrypt.hashSync('#livelikebrent123!', 10);
   writeData(USERS_FILE, {
     admin: defaultPassword,
     volunteer: defaultPassword
   });
-  console.log('Default credentials created - username: admin/volunteer, password: carve4cancer');
+  console.log('Default credentials created - username: admin/volunteer');
 }
 
 if (!fs.existsSync(RULES_FILE)) {
@@ -174,8 +183,10 @@ Thank you for helping us SHRED CANCER!`;
 
 function authenticate(username, password) {
   const users = readData(USERS_FILE);
-  if (users[username]) {
-    return bcrypt.compareSync(password, users[username]);
+  // Case-insensitive username lookup
+  const lowerUsername = username.toLowerCase();
+  if (users[lowerUsername]) {
+    return bcrypt.compareSync(password, users[lowerUsername]);
   }
   return false;
 }
@@ -196,16 +207,16 @@ app.post('/api/login', (req, res) => {
   const { username, password } = req.body;
 
   if (authenticate(username, password)) {
-    res.json({ success: true, role: username });
+    res.json({ success: true, role: isAdmin(username) ? 'admin' : 'volunteer', username: username.toLowerCase() });
   } else {
     res.status(401).json({ success: false, message: 'Invalid credentials' });
   }
 });
 
 app.post('/api/raffles', upload.single('image'), (req, res) => {
-  const { username, password, name, description, imageUrl } = req.body;
+  const { username, password, name, description, imageUrl, donatedBy } = req.body;
 
-  if (!authenticate(username, password) || username !== 'admin') {
+  if (!authenticate(username, password) || !isAdmin(username)) {
     return res.status(401).json({ success: false, message: 'Unauthorized' });
   }
 
@@ -221,6 +232,7 @@ app.post('/api/raffles', upload.single('image'), (req, res) => {
       number: maxNumber + 1,
       name,
       description,
+      donatedBy: donatedBy || null,
       image: '/uploads/' + imageFilename,
       winningNumber: null,
       createdAt: new Date().toISOString()
@@ -256,7 +268,7 @@ app.post('/api/raffles', upload.single('image'), (req, res) => {
 app.put('/api/raffles/reorder', (req, res) => {
   const { username, password, orderedIds } = req.body;
 
-  if (!authenticate(username, password) || username !== 'admin') {
+  if (!authenticate(username, password) || !isAdmin(username)) {
     return res.status(401).json({ success: false, message: 'Unauthorized' });
   }
 
@@ -289,10 +301,10 @@ app.put('/api/raffles/reorder', (req, res) => {
 });
 
 app.put('/api/raffles/:id', upload.single('image'), (req, res) => {
-  const { username, password, name, description, imageUrl } = req.body;
+  const { username, password, name, description, imageUrl, donatedBy } = req.body;
   const raffleId = parseInt(req.params.id);
 
-  if (!authenticate(username, password) || username !== 'admin') {
+  if (!authenticate(username, password) || !isAdmin(username)) {
     return res.status(401).json({ success: false, message: 'Unauthorized' });
   }
 
@@ -309,6 +321,7 @@ app.put('/api/raffles/:id', upload.single('image'), (req, res) => {
 
   raffles[raffleIndex].name = name;
   raffles[raffleIndex].description = description;
+  raffles[raffleIndex].donatedBy = donatedBy || null;
 
   const handleRaffleUpdate = (imageFilename) => {
     if (imageFilename) {
@@ -375,7 +388,7 @@ app.delete('/api/raffles/:id', (req, res) => {
   const { username, password } = req.body;
   const raffleId = parseInt(req.params.id);
 
-  if (!authenticate(username, password) || username !== 'admin') {
+  if (!authenticate(username, password) || !isAdmin(username)) {
     return res.status(401).json({ success: false, message: 'Unauthorized' });
   }
 
@@ -408,7 +421,7 @@ app.get('/api/rules', (req, res) => {
 app.put('/api/rules', (req, res) => {
   const { username, password, rules } = req.body;
 
-  if (!authenticate(username, password) || username !== 'admin') {
+  if (!authenticate(username, password) || !isAdmin(username)) {
     return res.status(401).json({ success: false, message: 'Unauthorized' });
   }
 
@@ -431,7 +444,7 @@ app.post('/api/change-password', (req, res) => {
   }
 
   const users = readData(USERS_FILE);
-  users[username] = bcrypt.hashSync(newPassword, 10);
+  users[username.toLowerCase()] = bcrypt.hashSync(newPassword, 10);
 
   if (writeData(USERS_FILE, users)) {
     res.json({ success: true, message: 'Password changed successfully' });
@@ -440,7 +453,102 @@ app.post('/api/change-password', (req, res) => {
   }
 });
 
+app.post('/api/users', (req, res) => {
+  const { adminUsername, adminPassword, newUsername, newPassword } = req.body;
+
+  if (!authenticate(adminUsername, adminPassword) || !isAdmin(adminUsername)) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+
+  if (!newUsername || !newPassword) {
+    return res.status(400).json({ success: false, message: 'Username and password required' });
+  }
+
+  const users = readData(USERS_FILE);
+  const lowerUsername = newUsername.toLowerCase();
+
+  if (users[lowerUsername]) {
+    return res.status(400).json({ success: false, message: 'User already exists' });
+  }
+
+  users[lowerUsername] = bcrypt.hashSync(newPassword, 10);
+
+  if (writeData(USERS_FILE, users)) {
+    res.json({ success: true, message: `User ${lowerUsername} created successfully` });
+  } else {
+    res.status(500).json({ success: false, message: 'Error creating user' });
+  }
+});
+
+// Sponsor endpoints
+app.get('/api/sponsors', (req, res) => {
+  const sponsors = readData(SPONSORS_FILE);
+  res.json(sponsors);
+});
+
+app.post('/api/sponsors', upload.single('logo'), (req, res) => {
+  const { username, password, name, websiteUrl } = req.body;
+
+  if (!authenticate(username, password) || !isAdmin(username)) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+
+  if (!name) {
+    return res.status(400).json({ success: false, message: 'Sponsor name is required' });
+  }
+
+  if (!req.file) {
+    return res.status(400).json({ success: false, message: 'Logo image is required' });
+  }
+
+  const sponsors = readData(SPONSORS_FILE);
+  const newSponsor = {
+    id: Date.now(),
+    name,
+    logo: '/uploads/' + req.file.filename,
+    websiteUrl: websiteUrl || null,
+    createdAt: new Date().toISOString()
+  };
+
+  sponsors.push(newSponsor);
+
+  if (writeData(SPONSORS_FILE, sponsors)) {
+    res.json({ success: true, sponsor: newSponsor });
+  } else {
+    res.status(500).json({ success: false, message: 'Error saving sponsor' });
+  }
+});
+
+app.delete('/api/sponsors/:id', (req, res) => {
+  const { username, password } = req.body;
+  const sponsorId = parseInt(req.params.id);
+
+  if (!authenticate(username, password) || !isAdmin(username)) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+
+  const sponsors = readData(SPONSORS_FILE);
+  const sponsorIndex = sponsors.findIndex(s => s.id === sponsorId);
+
+  if (sponsorIndex === -1) {
+    return res.status(404).json({ success: false, message: 'Sponsor not found' });
+  }
+
+  // Delete the logo file
+  const logoPath = path.join(__dirname, 'data', sponsors[sponsorIndex].logo);
+  if (fs.existsSync(logoPath)) {
+    fs.unlinkSync(logoPath);
+  }
+
+  sponsors.splice(sponsorIndex, 1);
+
+  if (writeData(SPONSORS_FILE, sponsors)) {
+    res.json({ success: true, message: 'Sponsor deleted' });
+  } else {
+    res.status(500).json({ success: false, message: 'Error deleting sponsor' });
+  }
+});
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running at http://0.0.0.0:${PORT}`);
-  console.log('Default login - username: admin or volunteer, password: carve4cancer');
 });
