@@ -399,8 +399,72 @@
 
         loadRaffles();
         loadRules();
-        setInterval(loadRaffles, 30000);
-        setInterval(loadRules, 60000);
+
+        // ============================================
+        // SSE (Server-Sent Events) for Real-Time Updates
+        // ============================================
+        let eventSource = null;
+        let reconnectAttempts = 0;
+        const MAX_RECONNECT_DELAY = 30000;
+
+        function connectSSE() {
+            if (eventSource) {
+                eventSource.close();
+            }
+
+            eventSource = new EventSource('/api/events');
+
+            eventSource.onopen = () => {
+                console.log('SSE connected');
+                reconnectAttempts = 0;
+            };
+
+            // Handle update events from server
+            eventSource.addEventListener('update', (e) => {
+                try {
+                    const { type, version } = JSON.parse(e.data);
+                    console.log(`SSE update: ${type} v${version}`);
+                    if (type === 'raffles') {
+                        loadRaffles();
+                    } else if (type === 'rules') {
+                        loadRules();
+                    } else if (type === 'sponsors') {
+                        loadSponsors();
+                    }
+                } catch (err) {
+                    console.error('SSE parse error:', err);
+                }
+            });
+
+            // Handle version event (sent on connect)
+            eventSource.addEventListener('version', (e) => {
+                console.log('SSE version info:', e.data);
+            });
+
+            eventSource.onerror = (e) => {
+                console.log('SSE error, reconnecting...');
+                eventSource.close();
+                eventSource = null;
+
+                // Exponential backoff reconnection
+                const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), MAX_RECONNECT_DELAY);
+                reconnectAttempts++;
+                setTimeout(connectSSE, delay);
+            };
+        }
+
+        // Connect to SSE
+        connectSSE();
+
+        // Fallback: poll every 5 minutes in case SSE fails silently
+        setInterval(() => {
+            if (!eventSource || eventSource.readyState === EventSource.CLOSED) {
+                console.log('SSE not connected, falling back to poll');
+                loadRaffles();
+                loadRules();
+                loadSponsors();
+            }
+        }, 300000);
 
         // Load and display sponsors
         async function loadSponsors() {
@@ -445,7 +509,7 @@
         }
 
         loadSponsors();
-        setInterval(loadSponsors, 60000);
+        // Note: Sponsor updates now handled via SSE, fallback poll at 5 min interval above
     </script>
 </body>
 </html>
