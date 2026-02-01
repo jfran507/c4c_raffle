@@ -10,7 +10,7 @@ const http = require('http');
 const rateLimit = require('express-rate-limit');
 
 // Import custom modules
-const { initDb, getDb, statements, bumpVersion } = require('./db');
+const { initDb, getDb, statements, bumpVersion, transaction } = require('./db');
 const cache = require('./cache');
 const sseManager = require('./sse');
 
@@ -102,16 +102,20 @@ const storage = multer.diskStorage({
 
 const upload = multer({
     storage: storage,
-    limits: { fileSize: 5 * 1024 * 1024 },
+    limits: { fileSize: 15 * 1024 * 1024 }, // 15 MB for high-res phone photos
     fileFilter: (req, file, cb) => {
-        const allowedTypes = /jpeg|jpg|png|gif/;
-        const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-        const mimetype = allowedTypes.test(file.mimetype);
+        // Accept common image extensions including HEIC from iPhones and webp
+        const allowedExtensions = /\.(jpeg|jpg|png|gif|heic|heif|webp)$/i;
+        const allowedMimetypes = /^image\/(jpeg|jpg|png|gif|heic|heif|webp)$/i;
 
-        if (mimetype && extname) {
+        const extOk = allowedExtensions.test(file.originalname);
+        const mimeOk = allowedMimetypes.test(file.mimetype) || file.mimetype.startsWith('image/');
+
+        // Accept if extension OR mimetype indicates an image
+        if (extOk || mimeOk) {
             return cb(null, true);
         } else {
-            cb('Error: Images only (jpeg, jpg, png, gif)');
+            cb('Error: Images only (jpeg, jpg, png, gif, heic)');
         }
     }
 });
@@ -409,8 +413,7 @@ app.put('/api/raffles/reorder', writeLimiter, async (req, res) => {
             return res.status(400).json({ success: false, message: 'orderedIds must be an array' });
         }
 
-        const db = getDb();
-        const updateMany = db.transaction(() => {
+        const updateMany = transaction(() => {
             orderedIds.forEach((id, index) => {
                 statements.updateRaffleNumber.run(index + 1, id);
             });
