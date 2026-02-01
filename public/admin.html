@@ -939,7 +939,7 @@
             templateHeight: 1500,
 
             // Content area positioning (relative to template, in pixels)
-            contentStartY: 620,
+            contentStartY: 560,
             contentPadding: 80,
 
             // QR code settings
@@ -1060,7 +1060,7 @@
             currentY += 40;
 
             // Draw Description (readable body text)
-            ctx.font = '46px Georgia, serif';
+            ctx.font = '54px Georgia, serif';
             ctx.fillStyle = '#1a5f7a';
             const maxDescWidth = canvas.width - PDF_CONFIG.contentPadding * 2;
             const descLines = wrapText(ctx, raffle.description, maxDescWidth);
@@ -1070,12 +1070,12 @@
                     line = line.slice(0, -3) + '...';
                 }
                 ctx.fillText(line, centerX, currentY);
-                currentY += 58;
+                currentY += 68;
             });
 
             // Draw Donor info (if present) - prominent donor name
             if (raffle.donatedBy) {
-                currentY = canvas.height - PDF_CONFIG.qrMargin - PDF_CONFIG.qrSize - 120;
+                currentY = canvas.height - PDF_CONFIG.qrMargin - PDF_CONFIG.qrSize - 80;
                 ctx.font = '36px Georgia, serif';
                 ctx.fillStyle = '#333333';
                 ctx.fillText('Donated by', centerX, currentY);
